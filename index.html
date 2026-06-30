@@ -2561,13 +2561,15 @@ async function supabaseSave(state) {
           apikey: SUPABASE_ANON_KEY,
           Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates'
+          Prefer: 'return=representation'
         },
         body: JSON.stringify({ content: state })
       }
     );
-    if (res.status === 404 || res.status === 406) {
-      // La fila no existe todavía: la creamos.
+    let updatedRows = [];
+    try { updatedRows = await res.json(); } catch (e) {}
+    if (!res.ok || !Array.isArray(updatedRows) || updatedRows.length === 0) {
+      // La fila no existe todavía (o el PATCH no afectó nada): la creamos.
       await fetch(SUPABASE_URL + '/rest/v1/portal_data', {
         method: 'POST',
         headers: {
