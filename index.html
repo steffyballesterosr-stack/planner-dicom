@@ -2554,35 +2554,27 @@ async function supabaseLoad() {
 async function supabaseSave(state) {
   console.log('[Supabase] Intentando guardar...');
   try {
+    // upsert: una sola petición simple (sin preflight complejo) que crea la
+    // fila si no existe o la actualiza si ya existe, según el id.
     const res = await fetch(
-      SUPABASE_URL + '/rest/v1/portal_data?id=eq.' + SUPABASE_ROW_ID,
+      SUPABASE_URL + '/rest/v1/portal_data?on_conflict=id',
       {
-        method: 'PATCH',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-          Prefer: 'return=representation'
-        },
-        body: JSON.stringify({ content: state })
-      }
-    );
-    let updatedRows = [];
-    try { updatedRows = await res.json(); } catch (e) {}
-    if (!res.ok) console.error('Supabase save (PATCH) error:', res.status, updatedRows);
-    if (!res.ok || !Array.isArray(updatedRows) || updatedRows.length === 0) {
-      // La fila no existe todavía (o el PATCH no afectó nada): la creamos.
-      const createRes = await fetch(SUPABASE_URL + '/rest/v1/portal_data', {
         method: 'POST',
         headers: {
           apikey: SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
-          Prefer: 'return=minimal'
+          Prefer: 'resolution=merge-duplicates,return=minimal'
         },
         body: JSON.stringify({ id: SUPABASE_ROW_ID, content: state })
-      });
-      if (!createRes.ok) console.error('Supabase save (POST) error:', createRes.status, await createRes.text());
+      }
+    );
+    if (res.ok) {
+      console.log('[Supabase] Guardado OK');
+    } else {
+      const text = await res.text().catch(() => '');
+      console.error('[Supabase] Guardado FALLÓ:', res.status, text);
     }
-  } catch (e) { console.error('Supabase save error:', e); }
+  } catch (e) { console.error('[Supabase] Error de red al guardar:', e); }
 }
 
 // Backfill fields added after a client may have saved state, and apply
