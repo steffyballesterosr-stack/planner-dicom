@@ -2552,6 +2552,7 @@ async function supabaseLoad() {
 }
 
 async function supabaseSave(state) {
+  console.log('[Supabase] Intentando guardar...');
   try {
     const res = await fetch(
       SUPABASE_URL + '/rest/v1/portal_data?id=eq.' + SUPABASE_ROW_ID,
@@ -2903,17 +2904,20 @@ function loadStorageAsync(setStore) {
 }
 function saveStore(state) {
   // Autoguardado local: el cronograma nunca depende de recordar exportar.
+  let stamped = state;
   try {
-    const stamped = Object.assign({}, state, { _savedAt: Date.now() });
+    stamped = Object.assign({}, state, { _savedAt: Date.now() });
     localStorage.setItem(STORE_KEY, JSON.stringify(stamped));
     // También guardamos en window.storage (persistencia cross-session en el artifact)
     if (window.storage && window.storage.set) {
       window.storage.set(STORE_KEY, JSON.stringify(stamped)).catch(() => {});
     }
-    // Guardado en Supabase: así todo el equipo ve los mismos datos sin
-    // descargar/subir el archivo manualmente.
-    supabaseSave(stamped);
-  } catch (e) {}
+  } catch (e) { console.error('saveStore local error:', e); }
+  // Guardado en Supabase: así todo el equipo ve los mismos datos sin
+  // descargar/subir el archivo manualmente. Fuera del try/catch de arriba
+  // para que un fallo local nunca bloquee este guardado, y con su propio
+  // catch para que cualquier error quede visible en consola.
+  Promise.resolve().then(() => supabaseSave(stamped)).catch(e => console.error('Supabase save outer error:', e));
 }
 function exportHTML(state) {
   try {
